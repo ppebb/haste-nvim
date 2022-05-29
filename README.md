@@ -12,6 +12,8 @@ require("haste").setup({
 })
 ```
 
+There are no default bindings, but a `:Haste` command is provided.
+
 ### Notes
 * Requires curl on the path
 * The haste instance should have an endpoint at `/documents`. A default haste server will have that so it shouldn't be an issue.
