@@ -12,27 +12,34 @@ local defaults = {
 function M.setup(conf)
     _config = vim.tbl_deep_extend("force", defaults, conf or {})
 
-    vim.api.nvim_create_user_command("Haste", function() M.upload() end, { nil })
+    vim.api.nvim_create_user_command("Haste", function(args) M.upload(args) end, { range = true })
 end
 
 local function notifywrap(message)
-    vim.schedule(function()
-        vim.notify(message)
-    end)
+    vim.schedule(function() vim.notify(message) end)
 end
 
-function M.upload()
+function M.upload(args)
     local stdout = uv.new_pipe()
     local stderr = uv.new_pipe()
-    local buftext = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
+    local text = table.concat(
+        vim.api.nvim_buf_get_lines(
+            0,
+            (args.range == 2) and args.line1 - 1 or 0,
+            (args.range == 2) and args.line2 or -1,
+            false
+        ),
+        "\n"
+    )
     local handle, pid
     handle, pid = uv.spawn(
-        "curl", {
+        "curl",
+        {
             args = {
                 "-XPOST",
                 _config.url .. "/documents",
                 "-d",
-                buftext,
+                text,
             },
             stdio = { nil, stdout, stderr },
         },
@@ -46,31 +53,31 @@ function M.upload()
     )
 
     if not handle then
-        notifywrap(string.format(" Haste: Failed to spawn curl (%s)", pid))
+        notifywrap(string.format("Haste: Failed to spawn curl (%s)", pid))
     end
 
     local function onstdout(err, data)
         if err then
-            notifywrap(string.format(" Haste: stdout - err: %s", err))
+            notifywrap(string.format("Haste: stdout - err: %s", err))
         elseif data then
             local index = string.find(data, "key")
             local url = _config.url .. "/" .. string.sub(data, index + 6, -3)
             if index ~= nil then
-                notifywrap(string.format(" Haste: Your document is %s", url))
+                notifywrap(string.format("Haste: Your document is %s", url))
                 if _config.setclip then
                     vim.schedule(function() vim.fn.setreg("+", url) end)
                 end
-            -- else
-                -- notifywrap(string.format(" Haste: stdout - data: %s", data))
+                -- else
+                -- notifywrap(string.format("Haste: stdout - data: %s", data))
             end
         end
     end
 
-    local function onstderr(err, data)
+    local function onstderr(err, _)
         if err then
-            notifywrap(string.format(" Haste: stderr - err: %s", err))
-        -- elseif data then
-            -- notifywrap(string.format(" Haste: stderr - data: %s", data))
+            notifywrap(string.format("Haste: stderr - err: %s", err))
+            -- elseif data then
+            -- notifywrap(string.format("Haste: stderr - data: %s", data))
         end
     end
 
